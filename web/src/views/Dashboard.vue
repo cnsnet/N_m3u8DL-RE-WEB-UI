@@ -50,8 +50,9 @@
         >
           <a-input
             v-model:value="quickDownloadForm.url"
-            placeholder="https://example.com/video.m3u8"
+            placeholder="支持粘贴：file_name https://example.com/video.m3u8"
             size="large"
+            @paste="handleQuickDownloadPaste"
           />
         </a-form-item>
         <a-row :gutter="12">
@@ -197,6 +198,42 @@ function getStatusText(status) {
   return texts[status] || status
 }
 
+function parsePastedTaskInput(text) {
+  const trimmedText = text.trim()
+  if (!trimmedText) {
+    return null
+  }
+
+  const parts = trimmedText.split(/\s+/).filter(Boolean)
+  if (parts.length === 0) {
+    return null
+  }
+
+  const url = parts[parts.length - 1]
+  const outputName = parts.slice(0, -1).join(' ')
+
+  return {
+    url,
+    outputName
+  }
+}
+
+function handleQuickDownloadPaste(event) {
+  const pastedText = event.clipboardData?.getData('text') || ''
+  const parsed = parsePastedTaskInput(pastedText)
+
+  if (!parsed) {
+    return
+  }
+
+  event.preventDefault()
+  quickDownloadForm.value.url = parsed.url
+
+  if (parsed.outputName) {
+    quickDownloadForm.value.outputName = parsed.outputName
+  }
+}
+
 async function handleQuickDownload() {
   if (!quickDownloadForm.value.url) {
     message.error('请输入m3u8链接')
@@ -207,7 +244,9 @@ async function handleQuickDownload() {
   try {
     await taskStore.createTask({
       url: quickDownloadForm.value.url,
-      output_name: quickDownloadForm.value.outputName || ''
+      output_name: quickDownloadForm.value.outputName || '',
+      auto_select: true,
+      del_after_done: true
     })
     message.success('任务已创建')
     quickDownloadForm.value = { url: '', outputName: '' }

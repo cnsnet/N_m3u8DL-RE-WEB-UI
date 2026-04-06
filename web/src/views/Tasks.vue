@@ -13,8 +13,9 @@
             <a-form-item label="m3u8 URL" name="url">
               <a-input
                 v-model:value="formState.url"
-                placeholder="https://example.com/video.m3u8"
+                placeholder="支持粘贴：file_name https://example.com/video.m3u8"
                 size="large"
+                @paste="handleUrlPaste"
               />
             </a-form-item>
           </a-col>
@@ -252,13 +253,13 @@ const logContent = ref('')
 const formState = reactive({
   url: '',
   outputName: '',
-  threadCount: 32,
-  retryCount: 15,
+  threadCount: 16,
+  retryCount: 5,
   headers: '',
   baseUrl: '',
   delAfterDone: true,
   binaryMerge: false,
-  autoSelect: false,
+  autoSelect: true,
   key: '',
   decryptionEngine: 'MP4DECRYPT',
   customArgs: '',
@@ -306,6 +307,44 @@ function formatTime(time) {
   return dayjs(time).format('YYYY-MM-DD HH:mm:ss')
 }
 
+function parsePastedTaskInput(text) {
+  const trimmedText = text.trim()
+  if (!trimmedText) {
+    return null
+  }
+
+  const parts = trimmedText.split(/\s+/).filter(Boolean)
+  if (parts.length === 0) {
+    return null
+  }
+
+  const url = parts[parts.length - 1]
+  const outputName = parts.slice(0, -1).join(' ')
+
+  return {
+    url,
+    outputName
+  }
+}
+
+function handleUrlPaste(event) {
+  const pastedText = event.clipboardData?.getData('text') || ''
+  const parsed = parsePastedTaskInput(pastedText)
+
+  if (!parsed) {
+    return
+  }
+
+  event.preventDefault()
+  formState.url = parsed.url
+
+  if (parsed.outputName) {
+    formState.outputName = parsed.outputName
+  }
+
+  formRef.value?.clearValidate?.(['url', 'outputName'])
+}
+
 async function fetchTasks() {
   const status = statusFilter.value ? `?status=${statusFilter.value}` : ''
   await taskStore.fetchTasks(status)
@@ -314,13 +353,13 @@ async function fetchTasks() {
 function resetForm() {
   formState.url = ''
   formState.outputName = ''
-  formState.threadCount = 32
-  formState.retryCount = 15
+  formState.threadCount = 16
+  formState.retryCount = 5
   formState.headers = ''
   formState.baseUrl = ''
   formState.delAfterDone = true
   formState.binaryMerge = false
-  formState.autoSelect = false
+  formState.autoSelect = true
   formState.key = ''
   formState.decryptionEngine = 'MP4DECRYPT'
   formState.customArgs = ''

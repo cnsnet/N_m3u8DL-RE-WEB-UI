@@ -20,7 +20,7 @@ type CreateTaskRequest struct {
 	BaseURL          string `json:"base_url"`
 	DelAfterDone     bool   `json:"del_after_done"`
 	BinaryMerge      bool   `json:"binary_merge"`
-	AutoSelect       bool   `json:"auto_select"`
+	AutoSelect       *bool  `json:"auto_select"`
 	Key              string `json:"key"`
 	DecryptionEngine string `json:"decryption_engine"`
 	CustomArgs       string `json:"custom_args"`
@@ -49,13 +49,18 @@ func CreateTask(c *gin.Context) {
 
 	// 设置默认值
 	if req.ThreadCount <= 0 {
-		req.ThreadCount = 32
+		req.ThreadCount = 16
 	}
 	if req.RetryCount <= 0 {
-		req.RetryCount = 15
+		req.RetryCount = 5
 	}
 	if req.DecryptionEngine == "" {
 		req.DecryptionEngine = "MP4DECRYPT"
+	}
+
+	autoSelect := true
+	if req.AutoSelect != nil {
+		autoSelect = *req.AutoSelect
 	}
 
 	// 转换为 service 层的请求类型
@@ -68,7 +73,7 @@ func CreateTask(c *gin.Context) {
 		BaseURL:          req.BaseURL,
 		DelAfterDone:     req.DelAfterDone,
 		BinaryMerge:      req.BinaryMerge,
-		AutoSelect:       req.AutoSelect,
+		AutoSelect:       autoSelect,
 		Key:              req.Key,
 		DecryptionEngine: req.DecryptionEngine,
 		CustomArgs:       req.CustomArgs,

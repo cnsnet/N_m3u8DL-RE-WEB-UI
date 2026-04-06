@@ -15,13 +15,13 @@ type Task struct {
 	DownloadedSize    string         `gorm:"size:32" json:"downloaded_size"`     // 已下载大小
 	TotalSize         string         `gorm:"size:32" json:"total_size"`          // 总大小
 	OutputName        string         `gorm:"size:512" json:"output_name"`
-	ThreadCount       int            `gorm:"default:32" json:"thread_count"`
-	RetryCount        int            `gorm:"default:15" json:"retry_count"`
+	ThreadCount       int            `gorm:"default:16" json:"thread_count"`
+	RetryCount        int            `gorm:"default:5" json:"retry_count"`
 	Headers           string         `gorm:"size:2048" json:"headers,omitempty"`
 	BaseURL           string         `gorm:"size:1024" json:"base_url,omitempty"`
 	DelAfterDone      bool           `gorm:"default:true" json:"del_after_done"`
 	BinaryMerge       bool           `gorm:"default:false" json:"binary_merge"`
-	AutoSelect        bool           `gorm:"default:false" json:"auto_select"`
+	AutoSelect        bool           `gorm:"default:true" json:"auto_select"`
 	Key               string         `gorm:"size:512" json:"key,omitempty"`
 	DecryptionEngine  string         `gorm:"size:32;default:'MP4DECRYPT'" json:"decryption_engine"`
 	CustomArgs        string         `gorm:"size:2048" json:"custom_args,omitempty"`

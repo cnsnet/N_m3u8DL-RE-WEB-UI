@@ -82,11 +82,11 @@ func CreateTask(req *CreateTaskRequest) (*model.Task, error) {
 	// 设置默认值
 	threadCount := req.ThreadCount
 	if threadCount <= 0 {
-		threadCount = 32
+		threadCount = 16
 	}
 	retryCount := req.RetryCount
 	if retryCount <= 0 {
-		retryCount = 15
+		retryCount = 5
 	}
 	decryptionEngine := req.DecryptionEngine
 	if decryptionEngine == "" {
@@ -323,14 +323,12 @@ func buildCommandArgs(task *model.Task, cfg *config.Config) []string {
 	args = append(args, "--download-retry-count", strconv.Itoa(task.RetryCount))
 
 	// 请求头
-	if task.Headers != "" {
-		headers := strings.Split(task.Headers, ";")
-		for _, h := range headers {
-			h = strings.TrimSpace(h)
-			if h != "" {
-				args = append(args, "-H", h)
-			}
-		}
+	headers := parseHeaders(task.Headers)
+	if strings.HasPrefix(task.URL, "https://surrit.com") && !hasHeader(headers, "Referer") {
+		headers = append(headers, "Referer: https://missav.ws/")
+	}
+	for _, h := range headers {
+		args = append(args, "-H", h)
 	}
 
 	// Base URL
@@ -384,6 +382,33 @@ func buildCommandArgs(task *model.Task, cfg *config.Config) []string {
 	}
 
 	return args
+}
+
+func parseHeaders(rawHeaders string) []string {
+	if rawHeaders == "" {
+		return nil
+	}
+
+	var headers []string
+	for _, h := range strings.Split(rawHeaders, ";") {
+		h = strings.TrimSpace(h)
+		if h != "" {
+			headers = append(headers, h)
+		}
+	}
+
+	return headers
+}
+
+func hasHeader(headers []string, headerName string) bool {
+	prefix := strings.ToLower(headerName) + ":"
+	for _, h := range headers {
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(h)), prefix) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // 任务日志检查时间阈值（秒）
