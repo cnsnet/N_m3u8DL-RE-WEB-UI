@@ -21,6 +21,14 @@
 
 ### Docker 快速体验
 
+- 本地运行测试
+`docker compose up --build -d`
+然后在浏览器中打开http://localhost:8080
+
+使用如下命令编译Docker镜像
+`docker build -t m3u8dl-web-ui:custom .`
+`docker save -o m3u8dl-web-ui-custom.tar m3u8dl-web-ui:custom`
+
 ```bash
 mkdir /data/m3u8dl -p
 cd /data/m3u8dl
