@@ -20,7 +20,7 @@ type CreateTaskRequest struct {
 	BaseURL            string `json:"base_url"`
 	DelAfterDone       *bool  `json:"del_after_done"`
 	BinaryMerge        bool   `json:"binary_merge"`
-	AutoSelect         bool   `json:"auto_select"`
+	AutoSelect         *bool  `json:"auto_select"`
 	SkipSegmentsCheck  bool   `json:"skip_segments_check"`
 	ConcurrentDownload bool   `json:"concurrent_download"`
 	Key                string `json:"key"`

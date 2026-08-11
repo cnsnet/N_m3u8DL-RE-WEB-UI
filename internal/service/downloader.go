@@ -28,7 +28,7 @@ type CreateTaskRequest struct {
 	BaseURL            string `json:"base_url"`
 	DelAfterDone       *bool  `json:"del_after_done"`
 	BinaryMerge        bool   `json:"binary_merge"`
-	AutoSelect         bool   `json:"auto_select"`
+	AutoSelect         *bool  `json:"auto_select"`
 	SkipSegmentsCheck  bool   `json:"skip_segments_check"`
 	ConcurrentDownload bool   `json:"concurrent_download"`
 	Key                string `json:"key"`
@@ -99,6 +99,11 @@ func CreateTask(req *CreateTaskRequest) (*model.Task, error) {
 	if req.DelAfterDone != nil {
 		delAfterDone = *req.DelAfterDone
 	}
+	// 未指定时默认自动选择最佳轨道（否则多码率 master playlist 在无终端环境会弹交互菜单崩溃）
+	autoSelect := true
+	if req.AutoSelect != nil {
+		autoSelect = *req.AutoSelect
+	}
 
 	task := model.Task{
 		URL:                req.URL,
@@ -110,7 +115,7 @@ func CreateTask(req *CreateTaskRequest) (*model.Task, error) {
 		BaseURL:            req.BaseURL,
 		DelAfterDone:       delAfterDone,
 		BinaryMerge:        req.BinaryMerge,
-		AutoSelect:         req.AutoSelect,
+		AutoSelect:         autoSelect,
 		SkipSegmentsCheck:  req.SkipSegmentsCheck,
 		ConcurrentDownload: req.ConcurrentDownload,
 		Key:                req.Key,
