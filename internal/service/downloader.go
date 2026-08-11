@@ -132,13 +132,13 @@ func DeleteTask(id uint) error {
 		return err
 	}
 
-	// 如果任务还在运行，先终止进程
-	if task.Status == model.TaskStatusDownloading && task.PID > 0 {
-		proc, err := os.FindProcess(task.PID)
-		if err == nil {
-			// 发送 SIGTERM 信号优雅终止
-			if err := proc.Signal(syscall.SIGTERM); err == nil {
-				log.Printf("已终止任务 %d 的进程 (PID: %d)", id, task.PID)
+	// 检查进程真实存活状态，存活则直接 kill，确保删除的任务是干净的
+	if task.PID > 0 && isProcessAlive(task.PID) {
+		if proc, err := os.FindProcess(task.PID); err == nil {
+			if err := proc.Signal(syscall.SIGKILL); err == nil {
+				log.Printf("已 kill 任务 %d 的进程 (PID: %d)", id, task.PID)
+			} else {
+				log.Printf("kill 任务 %d 的进程失败 (PID: %d): %v", id, task.PID, err)
 			}
 		}
 	}
@@ -149,6 +149,59 @@ func DeleteTask(id uint) error {
 	}
 
 	return model.GetDB().Delete(&task).Error
+}
+
+// RetryTask 重试失败/中断的任务，复用原有下载参数，重新进入待处理队列
+func RetryTask(id uint) (*model.Task, error) {
+	task, err := GetTaskByID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if task.Status != model.TaskStatusFailed && task.Status != model.TaskStatusInterrupted {
+		return nil, fmt.Errorf("只能重试失败或中断的任务")
+	}
+
+	task.Status = model.TaskStatusPending
+	task.Progress = 0
+	task.Speed = ""
+	task.DownloadedSize = ""
+	task.TotalSize = ""
+	task.ErrorMsg = ""
+	task.FinishedAt = nil
+	task.PID = 0
+
+	if err := model.GetDB().Save(task).Error; err != nil {
+		return nil, err
+	}
+
+	return task, nil
+}
+
+// DeleteCompletedTasks 删除所有已完成的任务，返回删除数量
+func DeleteCompletedTasks() (int64, error) {
+	var tasks []model.Task
+	if err := model.GetDB().Where("status = ?", model.TaskStatusCompleted).Find(&tasks).Error; err != nil {
+		return 0, err
+	}
+
+	for _, task := range tasks {
+		if task.LogFile != "" {
+			os.Remove(task.LogFile)
+		}
+	}
+
+	result := model.GetDB().Where("status = ?", model.TaskStatusCompleted).Delete(&model.Task{})
+	return result.RowsAffected, result.Error
+}
+
+// isProcessAlive 通过发送信号0真实检测进程是否存活
+func isProcessAlive(pid int) bool {
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	return proc.Signal(syscall.Signal(0)) == nil
 }
 
 func GetActiveTasks() ([]model.Task, error) {
@@ -219,6 +272,37 @@ func generateOutputName(url string) string {
 	return fmt.Sprintf("download_%d", time.Now().Unix())
 }
 
+// DefaultMaxConcurrentDownloads 默认同时下载任务数
+const DefaultMaxConcurrentDownloads = 1
+
+// GetMaxConcurrentDownloads 获取当前设置的最大同时下载任务数
+func GetMaxConcurrentDownloads() int {
+	var setting model.Setting
+	if err := model.GetDB().First(&setting, 1).Error; err != nil {
+		return DefaultMaxConcurrentDownloads
+	}
+	if setting.MaxConcurrentDownloads <= 0 {
+		return DefaultMaxConcurrentDownloads
+	}
+	return setting.MaxConcurrentDownloads
+}
+
+// SetMaxConcurrentDownloads 设置最大同时下载任务数
+func SetMaxConcurrentDownloads(n int) error {
+	if n <= 0 {
+		return fmt.Errorf("并发数必须大于0")
+	}
+
+	var setting model.Setting
+	if err := model.GetDB().First(&setting, 1).Error; err != nil {
+		setting = model.Setting{ID: 1, MaxConcurrentDownloads: n}
+		return model.GetDB().Create(&setting).Error
+	}
+
+	setting.MaxConcurrentDownloads = n
+	return model.GetDB().Save(&setting).Error
+}
+
 func StartTaskPolling(cfg *config.Config) {
 	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
@@ -235,14 +319,30 @@ func StartTaskPolling(cfg *config.Config) {
 			log.Printf("轮询: 发现 %d 个活跃任务", len(tasks))
 		}
 
+		var pendingTasks []model.Task
+		downloadingCount := 0
+
 		for _, task := range tasks {
-			if task.Status == model.TaskStatusPending {
-				log.Printf("轮询: 发现待处理任务 %d，启动下载", task.ID)
-				go startDownloadTask(task.ID, cfg)
-			} else if task.Status == model.TaskStatusDownloading {
+			if task.Status == model.TaskStatusDownloading {
 				log.Printf("轮询: 检查下载中任务 %d (PID: %d)", task.ID, task.PID)
 				updateTaskStatus(task.ID)
+				// 状态更新后重新确认是否仍在下载，已完成/失败的任务要释放并发槽位
+				if updated, err := GetTaskByID(task.ID); err == nil && updated.Status == model.TaskStatusDownloading {
+					downloadingCount++
+				}
+			} else if task.Status == model.TaskStatusPending {
+				pendingTasks = append(pendingTasks, task)
 			}
+		}
+
+		slots := GetMaxConcurrentDownloads() - downloadingCount
+		for _, task := range pendingTasks {
+			if slots <= 0 {
+				break
+			}
+			log.Printf("轮询: 发现待处理任务 %d，启动下载", task.ID)
+			go startDownloadTask(task.ID, cfg)
+			slots--
 		}
 	}
 }
@@ -444,20 +544,10 @@ func updateTaskStatus(taskID uint) {
 	}
 
 	// 真正检测进程是否还在运行
-	processStillRunning := false
-	if task.PID > 0 {
-		proc, err := os.FindProcess(task.PID)
-		if err == nil {
-			// 尝试发送信号0来真正检测进程是否存在
-			if err := proc.Signal(syscall.Signal(0)); err == nil {
-				processStillRunning = true
-			}
-		}
-	}
+	processStillRunning := task.PID > 0 && isProcessAlive(task.PID)
 
-	// 如果进程还在运行
+	// 如果进程还在运行，保留真实 PID，以便删除任务时能正确检测并终止进程
 	if processStillRunning {
-		task.PID = 0
 		model.GetDB().Save(task)
 		return
 	}

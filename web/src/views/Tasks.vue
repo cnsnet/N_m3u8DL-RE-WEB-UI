@@ -153,6 +153,15 @@
     <a-card title="下载任务" class="task-list">
       <template #extra>
         <a-space>
+          <span>同时下载数</span>
+          <a-input-number
+            v-model:value="maxConcurrent"
+            :min="1"
+            :max="50"
+            style="width: 80px"
+            :disabled="savingConcurrency"
+            @change="updateMaxConcurrent"
+          />
           <a-select
             v-model:value="statusFilter"
             style="width: 120px"
@@ -168,6 +177,12 @@
             <template #icon><ReloadOutlined /></template>
             刷新
           </a-button>
+          <a-popconfirm
+            title="确定删除所有已完成任务？"
+            @confirm="handleDeleteCompleted"
+          >
+            <a-button danger :loading="deletingCompleted">清空已完成</a-button>
+          </a-popconfirm>
         </a-space>
       </template>
 
@@ -196,6 +211,14 @@
           <template v-if="column.key === 'action'">
             <a-space>
               <a-button size="small" @click="viewLog(record)">日志</a-button>
+              <a-button
+                v-if="record.status === 'failed' || record.status === 'interrupted'"
+                size="small"
+                :loading="retryingId === record.id"
+                @click="handleRetry(record.id)"
+              >
+                重试
+              </a-button>
               <a-popconfirm
                 title="确定删除此任务？"
                 @confirm="handleDelete(record.id)"
@@ -235,6 +258,7 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
 import { useTaskStore } from '../stores/task'
+import { get, put } from '../api'
 
 dayjs.extend(relativeTime)
 dayjs.locale('zh-cn')
@@ -248,6 +272,10 @@ const keepFormAfterCreate = ref(false) // 创建后保留表单
 const logModalVisible = ref(false)
 const logLoading = ref(false)
 const logContent = ref('')
+const maxConcurrent = ref(1)
+const savingConcurrency = ref(false)
+const deletingCompleted = ref(false)
+const retryingId = ref(null)
 
 // 表单数据
 const formState = reactive({
@@ -278,7 +306,7 @@ const columns = [
   { title: '状态', dataIndex: 'status', key: 'status', width: 70 },
   { title: '进度', dataIndex: 'progress', key: 'progress', width: 100 },
   { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 130, responsive: ['lg'] },
-  { title: '操作', key: 'action', width: 100 }
+  { title: '操作', key: 'action', width: 160 }
 ]
 
 function getStatusColor(status) {
@@ -350,6 +378,28 @@ async function fetchTasks() {
   await taskStore.fetchTasks(status)
 }
 
+async function fetchSettings() {
+  try {
+    const res = await get('/settings')
+    maxConcurrent.value = res.max_concurrent_downloads
+  } catch (e) {
+    console.error('获取设置失败:', e)
+  }
+}
+
+async function updateMaxConcurrent(value) {
+  savingConcurrency.value = true
+  try {
+    await put('/settings', { max_concurrent_downloads: value })
+    message.success('并发数已更新')
+  } catch (err) {
+    message.error(err.response?.data?.error || '更新失败')
+    fetchSettings()
+  } finally {
+    savingConcurrency.value = false
+  }
+}
+
 function resetForm() {
   formState.url = ''
   formState.outputName = ''
@@ -415,6 +465,30 @@ async function handleDelete(id) {
   }
 }
 
+async function handleRetry(id) {
+  retryingId.value = id
+  try {
+    await taskStore.retryTask(id)
+    message.success('已重新加入下载队列')
+  } catch (err) {
+    message.error(err.response?.data?.error || '重试失败')
+  } finally {
+    retryingId.value = null
+  }
+}
+
+async function handleDeleteCompleted() {
+  deletingCompleted.value = true
+  try {
+    const res = await taskStore.deleteCompletedTasks()
+    message.success(`已删除 ${res.deleted} 个已完成任务`)
+  } catch (err) {
+    message.error(err.response?.data?.error || '删除失败')
+  } finally {
+    deletingCompleted.value = false
+  }
+}
+
 async function viewLog(task) {
   logModalVisible.value = true
   logLoading.value = true
@@ -433,6 +507,7 @@ async function viewLog(task) {
 onMounted(() => {
   // 使用 store 统一管理的轮询（单例模式）
   taskStore.startPolling()
+  fetchSettings()
 })
 
 onUnmounted(() => {

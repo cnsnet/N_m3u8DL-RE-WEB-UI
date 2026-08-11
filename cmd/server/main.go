@@ -76,12 +76,18 @@ func main() {
 			// 用户
 			protected.GET("/user", handler.GetUser)
 
+			// 设置
+			protected.GET("/settings", handler.GetSettings)
+			protected.PUT("/settings", handler.UpdateSettings)
+
 			// 任务管理
 			protected.GET("/tasks", handler.ListTasks)
 			protected.POST("/tasks", handler.CreateTask)
+			protected.DELETE("/tasks/completed", handler.DeleteCompletedTasks)
 			protected.GET("/tasks/:id", handler.GetTask)
 			protected.DELETE("/tasks/:id", handler.DeleteTask)
 			protected.GET("/tasks/:id/log", handler.GetTaskLog)
+			protected.POST("/tasks/:id/retry", handler.RetryTask)
 
 			// 文件管理
 			protected.GET("/files", handler.ListFiles)

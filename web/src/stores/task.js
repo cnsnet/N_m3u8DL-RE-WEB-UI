@@ -55,6 +55,21 @@ export const useTaskStore = defineStore('task', () => {
     tasks.value = tasks.value.filter(t => t.id !== id)
   }
 
+  async function retryTask(id) {
+    const res = await post(`/tasks/${id}/retry`)
+    const idx = tasks.value.findIndex(t => t.id === id)
+    if (idx !== -1) {
+      tasks.value[idx] = res
+    }
+    return res
+  }
+
+  async function deleteCompletedTasks() {
+    const res = await del('/tasks/completed')
+    tasks.value = tasks.value.filter(t => t.status !== 'completed')
+    return res
+  }
+
   async function getTaskProgress(id) {
     return await get(`/tasks/${id}`)
   }
@@ -71,6 +86,8 @@ export const useTaskStore = defineStore('task', () => {
     stopPolling,
     createTask,
     deleteTask,
+    retryTask,
+    deleteCompletedTasks,
     getTaskProgress,
     getTaskLog
   }

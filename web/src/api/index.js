@@ -32,6 +32,10 @@ export function post(url, data) {
   return api.post(url, data)
 }
 
+export function put(url, data) {
+  return api.put(url, data)
+}
+
 export function del(url) {
   return api.delete(url)
 }
