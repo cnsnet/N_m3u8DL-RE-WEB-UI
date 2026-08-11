@@ -502,9 +502,9 @@ func buildCommandArgs(task *model.Task, cfg *config.Config) []string {
 		args = append(args, "--binary-merge")
 	}
 
-	// 自动选择最佳轨道
+	// 自动选择最佳视频和音频轨道（不选字幕，避免字幕 mux 进 mp4 失败；显式选流也避免多码率 master playlist 弹交互菜单导致无终端环境崩溃）
 	if task.AutoSelect {
-		args = append(args, "--auto-select")
+		args = append(args, "-sv", "best", "-sa", "best")
 	}
 
 	// 分片数量完整性检测（默认开启，勾选跳过后显式传 False）
