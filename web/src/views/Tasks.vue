@@ -403,8 +403,8 @@ const progressGradient = { from: '#6366f1', to: '#8b5cf6' }
 const formState = reactive({
   url: '',
   outputName: '',
-  threadCount: 32,
-  retryCount: 15,
+  threadCount: 16,
+  retryCount: 5,
   headers: '',
   baseUrl: '',
   delAfterDone: true,
@@ -545,8 +545,8 @@ async function updateMaxConcurrent(value) {
 function resetForm() {
   formState.url = ''
   formState.outputName = ''
-  formState.threadCount = 32
-  formState.retryCount = 15
+  formState.threadCount = 16
+  formState.retryCount = 5
   formState.headers = ''
   formState.baseUrl = ''
   formState.delAfterDone = true
@@ -676,8 +676,8 @@ async function saveAsProfile(task) {
 function handleProfileChange(profileId) {
   if (!profileId) {
     // 清除方案时只重置配置字段，保留 url 和 outputName
-    formState.threadCount = 32
-    formState.retryCount = 15
+    formState.threadCount = 16
+    formState.retryCount = 5
     formState.headers = ''
     formState.baseUrl = ''
     formState.delAfterDone = true

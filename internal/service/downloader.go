@@ -84,11 +84,11 @@ func CreateTask(req *CreateTaskRequest) (*model.Task, error) {
 	// 设置默认值
 	threadCount := req.ThreadCount
 	if threadCount <= 0 {
-		threadCount = 32
+		threadCount = 16
 	}
 	retryCount := req.RetryCount
 	if retryCount <= 0 {
-		retryCount = 15
+		retryCount = 5
 	}
 	decryptionEngine := req.DecryptionEngine
 	if decryptionEngine == "" {
@@ -502,9 +502,9 @@ func buildCommandArgs(task *model.Task, cfg *config.Config) []string {
 		args = append(args, "--binary-merge")
 	}
 
-	// 自动选择最佳视频和音频轨道（不选字幕，避免字幕 mux 进 mp4 失败；显式选流也避免多码率 master playlist 弹交互菜单）
+	// 自动选择最佳轨道
 	if task.AutoSelect {
-		args = append(args, "-sv", "best", "-sa", "best")
+		args = append(args, "--auto-select")
 	}
 
 	// 分片数量完整性检测（默认开启，勾选跳过后显式传 False）

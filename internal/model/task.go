@@ -15,8 +15,8 @@ type Task struct {
 	DownloadedSize     string         `gorm:"size:32" json:"downloaded_size"` // 已下载大小
 	TotalSize          string         `gorm:"size:32" json:"total_size"`      // 总大小
 	OutputName         string         `gorm:"size:512" json:"output_name"`
-	ThreadCount        int            `gorm:"default:32" json:"thread_count"`
-	RetryCount         int            `gorm:"default:15" json:"retry_count"`
+	ThreadCount        int            `gorm:"default:16" json:"thread_count"`
+	RetryCount         int            `gorm:"default:5" json:"retry_count"`
 	Headers            string         `gorm:"size:2048" json:"headers,omitempty"`
 	BaseURL            string         `gorm:"size:1024" json:"base_url,omitempty"`
 	DelAfterDone       bool           `json:"del_after_done"` // 缺省为 true，在 service 层解析（GORM 的 default:true 会吞掉显式 false，勿加回）

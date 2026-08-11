@@ -51,10 +51,10 @@ func CreateTask(c *gin.Context) {
 
 	// 设置默认值
 	if req.ThreadCount <= 0 {
-		req.ThreadCount = 32
+		req.ThreadCount = 16
 	}
 	if req.RetryCount <= 0 {
-		req.RetryCount = 15
+		req.RetryCount = 5
 	}
 	if req.DecryptionEngine == "" {
 		req.DecryptionEngine = "MP4DECRYPT"
