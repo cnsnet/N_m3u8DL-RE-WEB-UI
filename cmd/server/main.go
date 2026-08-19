@@ -43,8 +43,18 @@ func main() {
 	r := gin.Default()
 
 	// CORS 配置
+	// 用 AllowOriginFunc 而非 AllowOrigins：gin-contrib/cors 对 AllowOrigins 强制校验
+	// 必须是 http://或 https:// 开头，无法放行浏览器插件的 chrome-extension:// 来源
+	allowedOrigins := make(map[string]bool)
+	for _, o := range strings.Split(cfg.AllowOrigins, ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			allowedOrigins[o] = true
+		}
+	}
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     strings.Split(cfg.AllowOrigins, ","),
+		AllowOriginFunc: func(origin string) bool {
+			return allowedOrigins[origin]
+		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
